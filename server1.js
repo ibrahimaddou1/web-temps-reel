@@ -32,8 +32,8 @@ app.post("/tcp", async (req, res) => {
 });
 
 require("./handshake")(app, {
-  origin: process.env.PUBLIC_URL || "http://172.20.10.2:3000",
-  peer: process.env.PEER_URL || "http://172.20.10.4:3001",
+  origin: process.argv[3] || process.env.PUBLIC_URL,
+  peer: process.argv[2] || process.env.PEER_URL,
 });
 
 // Création du serveur HTTP

@@ -11,8 +11,23 @@ module.exports = function installerHandshake(app, { origin, peer }) {
     return url.origin;
   }
 
+  if (!origin) {
+    throw new Error("Adresse publique manquante : definir PUBLIC_URL ou passer les arguments <URL_CAMARADE> <MON_URL>.");
+  }
   const adresse = lireOrigin(origin);
-  const cible = lireOrigin(peer);
+  const cibleParDefaut = peer ? lireOrigin(peer) : null;
+  function choisirCible(req, res) {
+    try {
+      const valeur = req.body?.peer || cibleParDefaut;
+      if (!valeur) throw new Error("Indiquer l'URL du camarade dans le champ JSON peer");
+      return lireOrigin(valeur);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+      return null;
+    }
+  }
+  console.log(`[configuration] Notre adresse : ${adresse}`);
+  console.log(`[configuration] Camarade par défaut : ${cibleParDefaut || "à choisir dans la requête"}`);
   const connexions = new Map();
   const surveillances = new Map();
 
@@ -33,6 +48,8 @@ module.exports = function installerHandshake(app, { origin, peer }) {
       oublier(url);
       return res.sendStatus(200);
     }
+    const cible = choisirCible(req, res);
+    if (!cible) return;
     oublier(cible);
     try {
       await axios.post(`${cible}/forget`, {}, {
@@ -111,6 +128,8 @@ module.exports = function installerHandshake(app, { origin, peer }) {
   app.get("/connexions", (req, res) => res.json([...connexions.values()]));
 
   app.post("/handshake", (req, res) => {
+    const cible = choisirCible(req, res);
+    if (!cible) return;
     const actuel = connexions.get(cible)?.etat;
     if (["SYN_ENVOYE", "SYN_ACK_ENVOYE", "ACK_ENVOYE"].includes(actuel)) {
       return res.status(409).json({ error: "Échange déjà en cours" });
