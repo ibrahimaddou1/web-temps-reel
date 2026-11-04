@@ -31,48 +31,9 @@ app.post("/tcp", async (req, res) => {
   }
 });
 
-// Protocole du collègue : chaque étape utilise une requête distincte.
-const API_B = "http://172.20.10.4:3001";
-let etatConnexion = "NON_CONNECTE";
-
-app.get("/connexions", (req, res) => {
-  res.json({ pair: "B", url: API_B, etat: etatConnexion });
-});
-
-app.post("/handshake", async (req, res) => {
-  if (["SYN_ENVOYE", "ACK_ENVOYE"].includes(etatConnexion)) {
-    return res.status(409).json({ error: "Un échange est déjà en cours" });
-  }
-  etatConnexion = "SYN_ENVOYE";
-  console.log("[A] --> SYN");
-  try {
-    await axios.post(`${API_B}/syn`, {}, { timeout: 5000, proxy: false });
-    // Le 200 de /syn n'est pas le SYN-ACK : celui-ci arrive sur /syn-ack.
-    res.status(202).json({ message: "SYN reçu par B ; consulter /connexions pour la suite", etat: etatConnexion });
-  } catch (error) {
-    etatConnexion = "ECHEC";
-    console.error("[A] Échec SYN :", error.message);
-    res.status(502).json({ error: "Échec de l'envoi SYN", detail: error.message });
-  }
-});
-
-app.post("/syn-ack", async (req, res) => {
-  if (etatConnexion !== "SYN_ENVOYE") {
-    return res.status(409).json({ error: "Aucun SYN en attente" });
-  }
-  console.log("[A] <-- SYN-ACK");
-  etatConnexion = "ACK_ENVOYE";
-  console.log("[A] --> ACK");
-  try {
-    await axios.post(`${API_B}/ack`, {}, { timeout: 5000, proxy: false });
-    etatConnexion = "ETABLI";
-    console.log("[A] Connexion simulée ETABLIE");
-    res.sendStatus(200);
-  } catch (error) {
-    etatConnexion = "ECHEC";
-    console.error("[A] Échec ACK :", error.message);
-    res.status(502).json({ error: "Échec de l'envoi ACK", detail: error.message });
-  }
+require("./handshake")(app, {
+  origin: process.env.PUBLIC_URL || "http://172.20.10.2:3000",
+  peer: process.env.PEER_URL || "http://172.20.10.4:3001",
 });
 
 // Création du serveur HTTP
