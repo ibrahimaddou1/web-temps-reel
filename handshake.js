@@ -31,6 +31,23 @@ module.exports = function installerHandshake(app, { origin, peer }) {
   const connexions = new Map();
   const surveillances = new Map();
 
+  // Messages applicatifs : action choisie pour notre premier usage du contrat.
+  app.post("/ingress", (req, res) => {
+    let expediteur;
+    try { expediteur = lireOrigin(req.get("Origin")); }
+    catch { return res.status(400).json({ error: "Header Origin absent ou invalide" }); }
+
+    if (req.body?.action !== "message") {
+      return res.status(400).json({ error: "Action inconnue", actions: ["message"] });
+    }
+    const text = req.body?.payload?.text;
+    if (typeof text !== "string" || !text.trim()) {
+      return res.status(400).json({ error: "payload.text doit être un texte non vide" });
+    }
+    console.log(`[message] ${expediteur} : ${text}`);
+    res.sendStatus(200);
+  });
+
   function oublier(url) {
     const suivi = surveillances.get(url);
     if (suivi) clearTimeout(suivi.timer);
