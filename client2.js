@@ -1,7 +1,7 @@
 const WebSocket = require("ws");
 
 const ws = new WebSocket("ws://localhost:3000");
-
+require("./chat-client") ;
 ws.on("open", () => {
   console.log("Client 2 connecté !");
   ws.send("Bonjour serveur, ici le client 2 !");
