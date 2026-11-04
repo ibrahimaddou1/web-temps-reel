@@ -27,8 +27,24 @@ app.get("/users", (req, res) => {
     });
 });
 
+// Envoyer uniquement aux connexions encore ouvertes.
+function broadcast(message) {
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+    }
+  });
+}
+
+let nextClientId = 1;
+
+// Gestion des connexions WebSocket
+wss.on("connection", (ws) => {
+  const clientId = nextClientId++;
+  console.log(`Client ${clientId} connecté (${wss.clients.size} connecté(s))`);
 // Connexion WebSocket
 wss.on("connection", (ws) => {
+
 
     console.log("Nouveau client connecté");
 
@@ -63,6 +79,21 @@ wss.on("connection", (ws) => {
 
     });
 
+    // Diffuser le message à tous les clients, y compris l'expéditeur
+    broadcast(message.toString());
+  });
+
+  // Déconnexion
+  ws.on("close", (code, reason) => {
+    // ws retire automatiquement cette connexion de wss.clients.
+    const notification = `Client ${clientId} déconnecté (${wss.clients.size} connecté(s))`;
+    console.log(`${notification} — code : ${code}, raison : ${reason.toString() || "aucune"}`);
+    broadcast(notification);
+  });
+
+  ws.on("error", (error) => {
+    console.error(`Erreur du client ${clientId} :`, error.message);
+  });
     // Déconnexion
     ws.on("close", () => {
         console.log("Un client est déconnecté");
