@@ -1,7 +1,7 @@
 
 const axios = require("axios");
 const WebSocket = require("ws");
-
+require("./chat-client") ;
 // 1. Tester une API REST avec Axios
 async function testAxios() {
   try {
