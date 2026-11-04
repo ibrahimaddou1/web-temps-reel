@@ -24,7 +24,7 @@ function testWebSocket() {
     console.log("WebSocket connecté !");
 
     // Envoyer un message au serveur
-    ws.send("Bonjour serveur !");
+    ws.send("Bonjour serveur ! ici le client 1 !");
   });
 
   // Recevoir les messages

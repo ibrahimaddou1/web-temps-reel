@@ -2,7 +2,7 @@
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
-const { WebSocketServer } = require("ws");
+const { WebSocket, WebSocketServer } = require("ws");
 
 const app = express();
 
@@ -41,8 +41,12 @@ wss.on("connection", (ws) => {
   ws.on("message", (message) => {
     console.log("Message reçu :", message.toString());
 
-    // Répondre au client
-    ws.send("Serveur : message bien reçu !");
+    // Diffuser le message à tous les clients, y compris l'expéditeur
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(message.toString());
+      }
+    });
   });
 
   // Déconnexion

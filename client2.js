@@ -1,47 +1,20 @@
-
-const axios = require("axios");
 const WebSocket = require("ws");
 
-// 1. Tester une API REST avec Axios
-async function testAxios() {
-  try {
-    const response = await axios.get(
-      "http://localhost:3000/users"
-    );
+const ws = new WebSocket("ws://localhost:3000");
 
-    console.log("Réponse HTTP :", response.data);
-  } catch (error) {
-    console.error("Erreur Axios :", error.message);
-  }
-}
+ws.on("open", () => {
+  console.log("Client 2 connecté !");
+  ws.send("Bonjour serveur, ici le client 2 !");
+});
 
-// 2. Tester WebSocket
-function testWebSocket() {
-  const ws = new WebSocket("ws://localhost:3000");
+ws.on("message", (message) => {
+  console.log("Message du serveur :", message.toString());
+});
 
-  // Connexion établie
-  ws.on("open", () => {
-    console.log("WebSocket connecté !");
+ws.on("close", () => {
+  console.log("Client 2 déconnecté");
+});
 
-    // Envoyer un message au serveur
-    ws.send("Bonjour serveur je suis client 2!");
-  });
-
-  // Recevoir les messages
-  ws.on("message", (message) => {
-    console.log("Message du serveur :", message.toString());
-  });
-
-  // Déconnexion
-  ws.on("close", () => {
-    console.log("Connexion fermée");
-  });
-
-  ws.on("error", (error) => {
-    console.error("Erreur WebSocket :", error.message);
-  });
-}
-
-// Exécution
-testAxios();
-testWebSocket();
+ws.on("error", (error) => {
+  console.error("Erreur WebSocket :", error.message);
+});
