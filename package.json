@@ -8,8 +8,8 @@
   "api1": "node server1.js",
   "api2": "node server2.js",
   "dev": "nodemon server1.js",
-  "client1": "node client1.js",
-  "client2": "node client2.js"
+  "client1": "node client1.js Ibrahim",
+  "client2": "node client2.js zakaria"
 },
   "keywords": [],
   "author": "",
