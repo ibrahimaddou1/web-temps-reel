@@ -14,21 +14,96 @@ module.exports = function installerHandshake(app, { origin, peer }) {
   const adresse = lireOrigin(origin);
   const cible = lireOrigin(peer);
   const connexions = new Map();
+  const surveillances = new Map();
+
+  function oublier(url) {
+    const suivi = surveillances.get(url);
+    if (suivi) clearTimeout(suivi.timer);
+    surveillances.delete(url);
+    connexions.delete(url);
+    console.log(`[oubli] ${url}`);
+  }
+
+  // Avec Origin : demande distante. Sans Origin : lancement local.
+  app.post("/forget", async (req, res) => {
+    if (req.get("Origin") !== undefined) {
+      let url;
+      try { url = lireOrigin(req.get("Origin")); }
+      catch { return res.status(400).json({ error: "Header Origin invalide" }); }
+      oublier(url);
+      return res.sendStatus(200);
+    }
+    oublier(cible);
+    try {
+      await axios.post(`${cible}/forget`, {}, {
+        headers: { Origin: adresse }, timeout: 5000, proxy: false,
+      });
+      res.json({ oublie: cible, camaradePrevenu: true });
+    } catch (error) {
+      res.json({ oublie: cible, camaradePrevenu: false, detail: error.message });
+    }
+  });
+
+  app.get("/health", (req, res) => {
+    res.json({ status: "ok", origin: adresse, uptime: process.uptime() });
+  });
+
+  function surveiller(url) {
+    if (surveillances.has(url)) return;
+    const suivi = { echecs: 0, timer: null };
+    surveillances.set(url, suivi);
+
+    async function verifier() {
+      let delai = 5000;
+      try {
+        const response = await axios.get(`${url}/health`, {
+          headers: { Origin: adresse }, timeout: 3000, proxy: false,
+        });
+        if (surveillances.get(url) !== suivi) return;
+        if (response.data?.status !== "ok") throw new Error("Healthcheck invalide");
+        suivi.echecs = 0;
+        Object.assign(connexions.get(url), {
+          sante: "DISPONIBLE", echecs: 0, derniereVerification: new Date().toISOString(),
+          erreur: null, prochainEssaiMs: delai,
+        });
+        console.log(`[healthcheck] ${url} disponible`);
+      } catch (error) {
+        if (surveillances.get(url) !== suivi) return;
+        suivi.echecs++;
+        // exp_backoff : 1 s, 2 s, 4 s, 8 s, 16 s, puis 30 s maximum.
+        delai = Math.min(1000 * 2 ** Math.min(suivi.echecs - 1, 5), 30000);
+        Object.assign(connexions.get(url), {
+          sante: "INDISPONIBLE", echecs: suivi.echecs,
+          derniereVerification: new Date().toISOString(), erreur: error.message,
+          prochainEssaiMs: delai,
+        });
+        console.log(`[exp_backoff] ${url} : échec ${suivi.echecs}, prochain essai dans ${delai / 1000}s`);
+      }
+      // Programmer après la réponse évite les vérifications simultanées.
+      suivi.timer = setTimeout(verifier, delai);
+      suivi.timer.unref();
+    }
+
+    suivi.timer = setTimeout(verifier, 0);
+    suivi.timer.unref();
+  }
 
   function etat(url, valeur) {
-    connexions.set(url, { url, etat: valeur });
+    connexions.set(url, { ...connexions.get(url), url, etat: valeur });
     console.log(`[${adresse}] ${url} : ${valeur}`);
+    if (valeur === "ETABLI") surveiller(url);
   }
 
   async function envoyer(url, route, attente, suite) {
+    const connexion = connexions.get(url);
     try {
       await axios.post(`${url}${route}`, {}, {
         headers: { Origin: adresse }, timeout: 5000, proxy: false,
       });
       // Un callback peut déjà avoir fait avancer l'état entre-temps.
-      if (suite && connexions.get(url)?.etat === attente) etat(url, suite);
+      if (suite && connexions.get(url) === connexion && connexion?.etat === attente) etat(url, suite);
     } catch (error) {
-      etat(url, "ECHEC");
+      if (connexions.get(url) === connexion) etat(url, "ECHEC");
       console.error(`Échec ${route} :`, error.message);
     }
   }
